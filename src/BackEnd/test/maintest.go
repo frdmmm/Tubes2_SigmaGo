@@ -95,7 +95,7 @@ func solveBFS(start, end string) ([]string, int, int) {
       continue
     }
 
-    articlesChecked += len(links)
+    articlesChecked++
 
     for _, link := range links {
       if !visited[link] {
@@ -135,13 +135,13 @@ func solveLimitedDepthDFS(start, end string, depth int) ([]string, int) {
   }
 
   fmt.Printf("Scraping links for %s...\n", start)
+  articlesChecked++;
   links, err := scrapeLinks(start)
   if err != nil {
     log.Printf("Error scraping links for %s: %v", start, err)
     return nil, articlesChecked
   }
 
-  articlesChecked += len(links)
 
   for _, link := range links {
     if !visited[link] {
@@ -172,7 +172,7 @@ func scrapeLinks(title string) ([]string, error) {
     var links []string
     doc.Find("#bodyContent #mw-content-text a").Each(func(i int, s *goquery.Selection) {
       link, exists := s.Attr("href")
-      if exists && strings.HasPrefix(link, "/wiki/") {
+      if exists && strings.HasPrefix(link, "/wiki/") && !strings.HasSuffix(link, getMediaSuffix()){
         linkTitle := strings.TrimPrefix(link, "/wiki/")
         links = append(links, linkTitle)
       }
@@ -180,6 +180,10 @@ func scrapeLinks(title string) ([]string, error) {
   
     return links, nil
   }
+func getMediaSuffix() string {
+    return `\.jpg|\.png|\.gif|\.bmp|\.mov|\.avi|\.mp4|\.pdf|\.docx|\.xlsx|\.pptx|\.jpeg`
+}
+
 
 func getPath(end string) []string {
     var path []string
