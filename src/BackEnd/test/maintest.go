@@ -83,54 +83,51 @@ func solveBFS(start, end string) ([]string, int, int) {
   visited[start] = true
   queue <- start
   workerCount := 0
+  timeOut := time.NewTimer(5 * time.Minute)
   for {
-    if len(queue) == 0 {
-      break // No more work and reached limit
-    }
-    if workerCount >=10 {
-      continue
-    }
-    currTitle, ok := <-queue
-    if !ok {
-      workerCount--
-      continue
-    }
-
-    if currTitle == end {
-      return getPath(end), articlesChecked, len(getPath(end))
-    }
-
-    fmt.Printf("Scraping links for %s...\n", currTitle)
-    workerCount++
-    go func(title string) {
-      workerCount--;
-      links, err := scrapeLinks(title)
-      if err != nil {
-        log.Printf("Error scraping links for %s: %v", title, err)
-        done <- true  // Signal completion even with error
-        return
-      }
-
-      articlesChecked++
-      for _, link := range links {
-        // Check if visited before printing
-        if !visited[link] {
-          visited[link] = true
-          edgeTo[link] = currTitle
-          queue <- link
-          fmt.Printf("Found link: https://en.wikipedia.org/wiki/%s\n", link) // Print link here
+    select{
+    case <- timeOut.C:
+      return []string{"No solution found"}, articlesChecked, 0
+    default:
+      if len(queue) > 0 && workerCount < 10 {//ERROR
+        currTitle, ok := <-queue
+        if !ok {
+          workerCount--
+          continue
         }
+    
+        if currTitle == end {
+          return getPath(end), articlesChecked, len(getPath(end))
+        }
+    
+        fmt.Printf("Scraping links for %s...\n", currTitle)
+        workerCount++
+        go func(title string) {
+          defer func() {
+            workerCount--
+          }()
+          links, err := scrapeLinks(title)
+          if err != nil {
+            log.Printf("Error scraping links for %s: %v", title, err)
+            done <- true  // Signal completion even with error
+            return
+          }
+    
+          articlesChecked++
+          for _, link := range links {
+            // Check if visited before printing
+            if !visited[link] {
+              visited[link] = true
+              edgeTo[link] = currTitle
+              queue <- link
+              fmt.Printf("Found link: https://en.wikipedia.org/wiki/%s\n", link) // Print link here
+            }
+          }
+          done <- true // Signal completion
+        }(currTitle)
       }
-      done <- true // Signal completion
-    }(currTitle)
+    }
   }
-
-  // Wait for all goroutines to finish (optional)
-  for i := 0; i < len(queue); i++ {
-    <-done
-  }
-
-  return []string{"No solution found"}, articlesChecked, 0
 }
 
 
