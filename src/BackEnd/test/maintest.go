@@ -84,8 +84,11 @@ func solveBFS(start, end string) ([]string, int, int) {
   queue <- start
   workerCount := 0
   for {
-    if workerCount >= 10 && len(queue) == 0 {
+    if len(queue) == 0 {
       break // No more work and reached limit
+    }
+    if workerCount >=10 {
+      continue
     }
     currTitle, ok := <-queue
     if !ok {
