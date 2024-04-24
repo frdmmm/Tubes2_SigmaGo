@@ -76,38 +76,61 @@ func solveBFS(start, end string) ([]string, int, int) {
     return []string{start}, 0, 0
   }
 
-  queue := []string{start}
-  visited[start] = true
+  queue := make(chan string, 10) // Buffer the channel to avoid deadlocks (adjust size as needed)
+  done := make(chan bool)
+  visited := make(map[string]bool)
   articlesChecked := 1
-
-  for len(queue) > 0 {
-    currTitle := queue[0]
-    queue = queue[1:]
+  visited[start] = true
+  queue <- start
+  workerCount := 0
+  for {
+    if workerCount >= 10 && len(queue) == 0 {
+      break // No more work and reached limit
+    }
+    currTitle, ok := <-queue
+    if !ok {
+      workerCount--
+      continue
+    }
 
     if currTitle == end {
       return getPath(end), articlesChecked, len(getPath(end))
     }
 
     fmt.Printf("Scraping links for %s...\n", currTitle)
-    links, err := scrapeLinks(currTitle)
-    if err != nil {
-      log.Printf("Error scraping links for %s: %v", currTitle, err)
-      continue
-    }
-
-    articlesChecked++
-
-    for _, link := range links {
-      if !visited[link] {
-        visited[link] = true
-        edgeTo[link] = currTitle
-        queue = append(queue, link)
+    workerCount++
+    go func(title string) {
+      workerCount--;
+      links, err := scrapeLinks(title)
+      if err != nil {
+        log.Printf("Error scraping links for %s: %v", title, err)
+        done <- true  // Signal completion even with error
+        return
       }
-    }
+
+      articlesChecked++
+      for _, link := range links {
+        // Check if visited before printing
+        if !visited[link] {
+          visited[link] = true
+          edgeTo[link] = currTitle
+          queue <- link
+          fmt.Printf("Found link: https://en.wikipedia.org/wiki/%s\n", link) // Print link here
+        }
+      }
+      done <- true // Signal completion
+    }(currTitle)
+  }
+
+  // Wait for all goroutines to finish (optional)
+  for i := 0; i < len(queue); i++ {
+    <-done
   }
 
   return []string{"No solution found"}, articlesChecked, 0
 }
+
+
 
 func solveIDS(start, end string) ([]string, int, int) {
   fmt.Println("Solving Wiki Race using IDS...")
@@ -163,7 +186,6 @@ func scrapeLinks(title string) ([]string, error) {
       return nil, err
     }
     defer resp.Body.Close()
-  
     doc, err := goquery.NewDocumentFromReader(resp.Body)
     if err != nil {
       return nil, err
