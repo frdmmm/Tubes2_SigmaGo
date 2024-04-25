@@ -1,0 +1,21 @@
+body {
+    font-family: Arial, sans-serif;
+  }
+  
+  form {
+    margin-bottom: 20px;
+  }
+  
+  label {
+    margin-right: 10px;
+  }
+  
+  input[type="text"],
+  select {
+    margin-right: 10px;
+  }
+  
+  button {
+    cursor: pointer;
+  }
+  

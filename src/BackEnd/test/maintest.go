@@ -27,6 +27,16 @@ var (
 
 func main() {
   r := gin.Default()
+  r.Use(func(c *gin.Context) {
+    c.Writer.Header().Set("Access-Control-Allow-Origin", "http://localhost:7000")
+    c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+    c.Writer.Header().Set("Access-Control-Allow-Headers", "Origin, Content-Type")
+    if c.Request.Method == "OPTIONS" {
+        c.AbortWithStatus(http.StatusNoContent)
+        return
+    }
+    c.Next()
+})
 
   r.POST("/solve", solveHandler)
 
@@ -89,7 +99,7 @@ func solveBFS(start, end string) ([]string, int, int) {
     case <- timeOut.C:
       return []string{"No solution found"}, articlesChecked, 0
     default:
-      if len(queue) > 0 && workerCount < 10 {//ERROR
+      if true{//ERROR
         currTitle, ok := <-queue
         if !ok {
           workerCount--
