@@ -4,13 +4,12 @@ document.getElementById('searchForm').addEventListener('submit', function(event)
     const end = document.getElementById('end').value;
     const algorithm = document.getElementById('algorithm').value;
   
-    // Construct form data
+
     const formData = new FormData();
     formData.append('start', start);
     formData.append('end', end);
     formData.append('algo', algorithm);
-  
-    // Make a POST request to the backend
+
     fetch('http://localhost:8080/solve', {
       method: 'POST',
       body: formData
@@ -20,10 +19,10 @@ document.getElementById('searchForm').addEventListener('submit', function(event)
         throw new Error('Network response was not ok');
       }
       return response.json();
-    }) // Parse response as JSON
+    }) 
     .then(data => {
       console.log(data);
-      // Display response in the results div
+
       const resultsDiv = document.getElementById('results');
       resultsDiv.innerHTML = `
         <p>Solution: ${data.solution}</p>
@@ -32,16 +31,15 @@ document.getElementById('searchForm').addEventListener('submit', function(event)
         <p>Time Taken: ${data.timeTaken}</p>
       `;
 
-      // Draw graph
       const graphContainer = document.getElementById('graph-container');
-      graphContainer.innerHTML = ''; // Clear previous graph
+      graphContainer.innerHTML = '';
 
       const solution = data.solution;
       const nodePositions = {};
-      const nodeDistance = 100; // Adjust node distance as needed
+      const nodeDistance = 100;
 
       solution.forEach((node, index) => {
-          const leftPosition = index * nodeDistance + 50; // Adjust starting position as needed
+          const leftPosition = index * nodeDistance + 50; 
           nodePositions[node] = { left: leftPosition };
           
           // Draw node
@@ -51,16 +49,15 @@ document.getElementById('searchForm').addEventListener('submit', function(event)
           nodeElement.style.left = `${leftPosition}px`;
           graphContainer.appendChild(nodeElement);
           
-          // Draw edge
+
           if (index > 0) {
               const edgeElement = document.createElement('div');
               edgeElement.className = 'edge';
-              edgeElement.style.left = `${leftPosition - nodeDistance / 2}px`; // Adjust edge position as needed
+              edgeElement.style.left = `${leftPosition - nodeDistance / 2}px`; 
               graphContainer.appendChild(edgeElement);
           }
       });
 
-      // Set edge height to match node height
       const edgeElements = document.querySelectorAll('.edge');
       edgeElements.forEach(edge => {
           edge.style.height = `${graphContainer.querySelector('.node').offsetHeight}px`;
