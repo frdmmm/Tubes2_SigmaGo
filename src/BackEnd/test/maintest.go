@@ -167,7 +167,7 @@ func solveIDS(start, end string) ([]string, int, int) {
     visited = make(map[string]bool)
     edgeTo = make(map[string]string)
     solution, articlesChecked := solveLimitedDepthDFS(start, end, depth)
-    if solution[0] != "No solution found" {
+    if solution != nil {
       return solution, articlesChecked, len(solution) // Path length for IDS is the solution length
     }
   }
@@ -195,12 +195,10 @@ func solveLimitedDepthDFS(start, end string, depth int) ([]string, int) {
 
 
   for _, link := range links {
-    if !visited[link] {
-      solution, articlesChecked := solveLimitedDepthDFS(link, end, depth-1)
-      if solution != nil {
-        edgeTo[link] = start
-        return append([]string{link}, solution...), articlesChecked
-      }
+    solution, articlesChecked := solveLimitedDepthDFS(link, end, depth-1)
+    if solution != nil {
+      edgeTo[link] = start
+      return append([]string{link}, solution...), articlesChecked
     }
   }
 
