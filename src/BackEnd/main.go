@@ -101,7 +101,7 @@ func solveBFS(start, end string) ([]string, int, int) {
   defer cancel()
 
   g, _ := errgroup.WithContext(ctx)
-  g.SetLimit(300)
+  g.SetLimit(500)
 
 
   defer func() {
