@@ -23,8 +23,9 @@ type Page struct {
 var (
   visited      map[string]bool
   edgeTo       map[string]string
-  maxDepth     int = 6
+  maxDepth     int = 9
   searchAlgo    string
+  articlesVisit int = 0
 )
 
 func main() {
@@ -156,53 +157,49 @@ func solveBFS(start, end string) ([]string, int, int) {
   }
 }
 
-
-
-
-
 func solveIDS(start, end string) ([]string, int, int) {
   fmt.Println("Solving Wiki Race using IDS...")
+  articlesVisit = 0
 
   for depth := 1; depth <= maxDepth; depth++ {
     visited = make(map[string]bool)
     edgeTo = make(map[string]string)
-    solution, articlesChecked := solveLimitedDepthDFS(start, end, depth)
+    solution := solveLimitedDepthDFS(start, end, depth)
     if solution != nil {
-      return solution, articlesChecked, len(solution) // Path length for IDS is the solution length
+      return solution, articlesVisit, len(solution) // Path length for IDS is the solution length
     }
   }
   return []string{"No solution found within max depth"}, 0, 0
 }
 
-func solveLimitedDepthDFS(start, end string, depth int) ([]string, int) {
+func solveLimitedDepthDFS(start, end string, depth int) ([]string) {
   visited[start] = true
-  articlesChecked := 1
 
   if depth == 0 || start == end {
     if start == end {
-      return []string{start}, articlesChecked
+      return []string{start}
     }
-    return nil, articlesChecked // No solution found within current depth
+    return nil // No solution found within current depth
   }
 
   fmt.Printf("Scraping links for %s...\n", start)
-  articlesChecked++;
+  articlesVisit++;
   links, err := scrapeLinks(start)
   if err != nil {
     log.Printf("Error scraping links for %s: %v", start, err)
-    return nil, articlesChecked
+    return nil
   }
 
 
   for _, link := range links {
-    solution, articlesChecked := solveLimitedDepthDFS(link, end, depth-1)
+    solution := solveLimitedDepthDFS(link, end, depth-1)
     if solution != nil {
       edgeTo[link] = start
-      return append([]string{link}, solution...), articlesChecked
+      return append([]string{start}, solution...)
     }
   }
 
-  return nil, articlesChecked // No solution found within current depth at this branch
+  return nil // No solution found within current depth at this branch
 }
 
 func scrapeLinks(title string) ([]string, error) {
