@@ -1,14 +1,17 @@
 package main
-import (
-  "fmt"
-  "log"
-  "net/http"
 
-  "strings"
-  "sync"
-  "time"
-  "github.com/gin-gonic/gin"
-  "github.com/PuerkitoBio/goquery"
+import (
+	"fmt"
+	"log"
+	"net/http"
+  "context"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/PuerkitoBio/goquery"
+	"github.com/gin-gonic/gin"
+	"golang.org/x/sync/errgroup"
 )
 
 // Page represents a Wikipedia page with its title and links
@@ -20,7 +23,6 @@ type Page struct {
 var (
   visited      map[string]bool
   edgeTo       map[string]string
-  mutex        *sync.Mutex
   maxDepth     int = 6
   searchAlgo    string
 )
@@ -82,63 +84,79 @@ func solveHandler(c *gin.Context) {
 func solveBFS(start, end string) ([]string, int, int) {
   fmt.Println("Solving Wiki Race using BFS...")
 
+  var mutex sync.Mutex
+
   if start == end {
-    return []string{start}, 0, 0
+      return []string{start}, 0, 0
   }
 
-  queue := make(chan string, 10) // Buffer the channel to avoid deadlocks (adjust size as needed)
-  done := make(chan bool)
+  queue := make(chan string, 10000)
   visited := make(map[string]bool)
   articlesChecked := 1
   visited[start] = true
   queue <- start
-  workerCount := 0
-  timeOut := time.NewTimer(5 * time.Minute)
+
+  ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+  defer cancel()
+
+  g, _ := errgroup.WithContext(ctx)
+  g.SetLimit(300)
+
+
+  defer func() {
+
+      go func() {
+          g.Wait()
+          close(queue)
+      }()
+  }()
+
   for {
-    select{
-    case <- timeOut.C:
-      return []string{"No solution found"}, articlesChecked, 0
-    default:
-      if true{//ERROR
-        currTitle, ok := <-queue
-        if !ok {
-          workerCount--
-          continue
-        }
-    
-        if currTitle == end {
-          return getPath(end), articlesChecked, len(getPath(end))
-        }
-    
-        fmt.Printf("Scraping links for %s...\n", currTitle)
-        workerCount++
-        go func(title string) {
-          defer func() {
-            workerCount--
-          }()
-          links, err := scrapeLinks(title)
-          if err != nil {
-            log.Printf("Error scraping links for %s: %v", title, err)
-            done <- true  // Signal completion even with error
-            return
+      select {
+      case <-ctx.Done():
+          return []string{"No solution found"}, articlesChecked, 0
+      case currTitle, ok := <-queue:
+          if !ok {
+              continue
           }
-    
+
+          if currTitle == end {
+              return getPath(end), articlesChecked, len(getPath(end))
+          }
+
+          fmt.Printf("Scraping links for %s...\n", currTitle)
+
+          curr := currTitle
           articlesChecked++
-          for _, link := range links {
-            // Check if visited before printing
-            if !visited[link] {
-              visited[link] = true
-              edgeTo[link] = currTitle
-              queue <- link
-              fmt.Printf("Found link: https://en.wikipedia.org/wiki/%s\n", link) // Print link here
-            }
-          }
-          done <- true // Signal completion
-        }(currTitle)
+          g.Go(func() error {
+              links, err := scrapeLinks(curr)
+              if err != nil {
+                  log.Printf("Error scraping links for %s: %v", curr, err)
+                  return err
+              }
+
+              mutex.Lock()
+              defer mutex.Unlock()
+
+              for _, link := range links {
+                  if !visited[link] {
+                      visited[link] = true
+                      edgeTo[link] = curr
+                      select {
+                      case queue <- link:
+                      default:
+
+                      }
+                  }
+              }
+
+              return nil
+          })
       }
-    }
   }
 }
+
+
 
 
 
@@ -188,30 +206,38 @@ func solveLimitedDepthDFS(start, end string, depth int) ([]string, int) {
 
   return nil, articlesChecked // No solution found within current depth at this branch
 }
+
 func scrapeLinks(title string) ([]string, error) {
     url := fmt.Sprintf("https://en.wikipedia.org/wiki/%s", title)
-    fmt.Println("Scraping URL:", url)
+    // fmt.Println("Scraping URL:", url)
     resp, err := http.Get(url)
     if err != nil {
-      return nil, err
+        return nil, err
     }
     defer resp.Body.Close()
+
     doc, err := goquery.NewDocumentFromReader(resp.Body)
     if err != nil {
-      return nil, err
+        return nil, err
     }
-  
+
     var links []string
     doc.Find("#bodyContent #mw-content-text a").Each(func(i int, s *goquery.Selection) {
-      link, exists := s.Attr("href")
-      if exists && strings.HasPrefix(link, "/wiki/") && !strings.HasSuffix(link, getMediaSuffix()){
-        linkTitle := strings.TrimPrefix(link, "/wiki/")
-        links = append(links, linkTitle)
-      }
+        link, exists := s.Attr("href")
+        if exists && strings.HasPrefix(link, "/wiki/") && !strings.HasSuffix(link, getMediaSuffix()) {
+            linkTitle := strings.TrimPrefix(link, "/wiki/")
+            if !strings.Contains(linkTitle, ":") {
+                // Lock the mutex before accessing the visited map
+                // Unlock the mutex when done
+
+                // Only add the link if it hasn't been visited before
+                links = append(links, linkTitle)
+            }
+        }
     })
-  
+
     return links, nil
-  }
+}
 func getMediaSuffix() string {
     return `\.jpg|\.png|\.gif|\.bmp|\.mov|\.avi|\.mp4|\.pdf|\.docx|\.xlsx|\.pptx|\.jpeg`
 }
